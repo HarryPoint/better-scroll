@@ -2,16 +2,16 @@
 
 ## Introduction
 
-  The pullup plugin provides BetterScroll with the ability to monitor pullups. The 'pullingUp' event is triggered when a pull up is successfully detected. Usually used to implement list/page scrolling to the bottom, pull up to load more data.
+The pullup plugin provides BetterScroll with the ability to monitor pulldown operation.
 
 ## Install
 
 ```bash
-npm install @better-scroll/pull-up@next --save
+npm install @better-scroll/pull-up --save
 
 // or
 
-yarn add @better-scroll/pull-up@next
+yarn add @better-scroll/pull-up
 ```
 
 ## Usage
@@ -19,24 +19,23 @@ yarn add @better-scroll/pull-up@next
 First, install the plugin via the static method `BScroll.use()`
 
 ```js
-import BScroll from '@better-scroll/core'
-import Pullup from '@better-scroll/pull-up'
+  import BScroll from '@better-scroll/core'
+  import PullUp from '@better-scroll/pull-up'
 
-BScroll.use(Pullup)
+  BScroll.use(PullUp)
 ```
 
-Then, To instantiate BetterScroll, you need to pass the pullup related configuration item `pullUpLoad`:
+pass in the correct configuration in [options](./pullup.html#pullupload-options), for example:
 
 ```js
-new BScroll('.bs-wrap', {
-  scrollY: true,
-  pullUpLoad: true
-})
+  new BScroll('.bs-wrapper', {
+    pullUpLoad: true
+  })
 ```
 
 ## Demo
 
-<demo qrcode-url="pullup/">
+<demo qrcode-url="pullup/" :render-code="true">
   <template slot="code-template">
     <<< @/examples/vue/components/pullup/default.vue?template
   </template>
@@ -49,49 +48,98 @@ new BScroll('.bs-wrap', {
   <pullup-default slot="demo"></pullup-default>
 </demo>
 
-## Options: pullUpLoad
+## pullUpLoad Options
 
-The default is false. When set to true or an Object, pull-up loading can be turned on. When the configuration item is an Object, it has the following properties:
+### threshold
 
-|Name|Type|Description|Default|
-|----------|:-----:|:-----------|:--------:|
-| threshold | number | Threshold for triggering a pullup event | 0 |
+  - **Type**: `number`
+  - **Default**: `0`
 
-## API
+  The threshold for triggering a `pullingUp` hook.
+
+:::tip
+When `pullUpLoad` is configured as `true`, the plugin uses the default plugin option.
+
+```js
+const bs = new BScroll('.wrapper', {
+  pullUpLoad: true
+})
+
+// equals
+
+const bs = new BScroll('.wrapper', {
+  pullUpLoad: {
+    threshold: 0
+  }
+})
+```
+:::
+
+## Instance Methods
+
+:::tip
+All methods are proxied to BetterScroll instance, for example:
+
+```js
+import BScroll from '@better-scroll/core'
+import PullUp from '@better-scroll/pull-up'
+
+BScroll.use(PullUp)
+
+const bs = new BScroll('.bs-wrapper', {
+  pullUpLoad: true
+})
+
+bs.finishPullUp()
+bs.openPullUp({})
+bs.closePullUp()
+```
+:::
 
 ### `finishPullUp()`
 
-  - **Introduction**：Identifies the end of a pull-up loading action.
-  - **Parameters**: None
-  - **Return value**: None
+  - **Details**: Finish the pullUpLoad behavior.
 
-::: warning
+  ::: warning
+  Every time you trigger the `pullingUp` hook, you should **actively call** `finishPullUp()` to tell BetterScroll to be ready for the next pullingUp hook.
+  :::
 
-Note: **The `finishPullUp()` method should be called at the end of the callback function each time the pullup event is triggered. The next `pullingUp` event will not fire until the `finishPullUp()` method is called.**
+### `openPullUp(config: PullUpLoadOptions = {})`
 
-:::
+  - **Details**: Turn on the pullUpLoad dynamically.
+  - **Arguments**:
+    - `{ PullDownRefreshOptions } config`: Modify the option of the pullup plugin
+    - `PullDownRefreshOptions`:
 
-### `openPullUp(config: pullUpLoadOptions = true)`
+    ```typescript
+    export type PullUpLoadOptions = Partial<PullUpLoadConfig> | true
 
-  - **Introduction**：Turn on the pull-up loading function. This method does not need to be called if the `pullUpLoad` configuration item is not `false` when BetterScroll is instantiated.
-  - **Parameters**：`config: boolean | { threshold: number }` ，The parameter is the pullUpLoad configuration. The default is false.
-  - **Return value**：None
+    export interface PullUpLoadConfig {
+      threshold: number
+    }
+    ```
+
+  ::: warning
+  The **openPullUp** method should be used with **closePullUp**, because in the process of generating the pullup plugin, the pullUpLoad action has been automatically monitored.
+  :::
 
 ### `closePullUp()`
 
-  - **Introduction**：Turn off pullup.
-  - **Parameters**: None
-  - **Return value**：None
+  - **Details**: Turn off pullUpLoad dynamically.
 
-### `autoPullDownRefresh()`
+### `autoPullUpLoad()`
 
-  - **Introduction**：Auto pulldown-refresh。
-  - **Parameters**：None
-  - **Return value**：None
+  - **Details**：Auto pullUp.
 
-## Hooks
+## Events
 
 ### `pullingUp`
 
-- **params**: None
-- **trigger**：A `pullingUp` event is fired when the distance scrolls to the bottom less than the `threshold` value.
+  - **Arguments**: None
+  - **Trigger**: When the distance to the bottom is less than the value of `threshold`, a `pullingUp` event is triggered.
+
+  > When threshold is a positive number, it means `pullingUp` is triggered when the threshold pixel is away from the scroll boundary. On the contrary, it means that the event will be triggered when it crosses the scroll boundary.
+
+::: danger Note
+After the pullUpLoad action is detected, the consumption opportunity of the `pullingUp` event is only once, so you need to call `finishPullUp()` to tell BetterScroll to provide the next consumption opportunity of the `pullingUp` event.
+:::

@@ -2,40 +2,39 @@
 
 ## 介绍
 
-  pullup 插件为 BetterScroll 提供了监测上拉动作的能力。当成功监测到一次上拉动作时，会触发 `pullingUp` 事件。通常用于实现列表/页面滚动到底部时，上拉加载更多数据的功能。
+pullup 插件为 BetterScroll 扩展上拉加载的能力。
 
 ## 安装
 
 ```bash
-npm install @better-scroll/pull-up@next --save
+npm install @better-scroll/pull-up --save
 
 // or
 
-yarn add @better-scroll/pull-up@next
+yarn add @better-scroll/pull-up
 ```
 
 ## 使用
 
-通过静态方法 `BScroll.use()` 初始化插件
+通过静态方法 `BScroll.use()` 注册插件
 
 ```js
-import BScroll from '@better-scroll/core'
-import Pullup from '@better-scroll/pull-up'
+  import BScroll from '@better-scroll/core'
+  import Pullup from '@better-scroll/pull-up'
 
-BScroll.use(Pullup)
+  BScroll.use(Pullup)
 ```
 
-然后，实例化 BetterScroll 时需要传入 pullup 相关配置项 `pullUpLoad`：
+然后，实例化 BetterScroll 时需要传入[ pullup 配置项](./pullup.html#pullupload-选项对象)。
 
 ```js
-new BScroll('.bs-wrap', {
-  scrollY: true,
-  pullUpLoad: true
-})
+  new BScroll('.bs-wrapper', {
+    pullUpLoad: true
+  })
 ```
 ## 示例
 
-<demo qrcode-url="pullup/">
+<demo qrcode-url="pullup/" :render-code="true">
   <template slot="code-template">
     <<< @/examples/vue/components/pullup/default.vue?template
   </template>
@@ -48,43 +47,98 @@ new BScroll('.bs-wrap', {
   <pullup-default slot="demo"></pullup-default>
 </demo>
 
-## 配置项 pullUpLoad
+## pullUpLoad 选项对象
 
-默认为 false。当设置为 true 或者是一个 Object 的时候，可以开启上拉加载。当配置项为一个 Object 时，有如下属性：
+### threshold
 
-|名称|类型|描述|默认值|
-|----------|:-----:|:-----------|:--------:|
-| threshold | number | 触发上拉事件的阈值 | 0 |
+  - **类型：** `number`
+  - **默认值：** `0`
 
-## 方法
+    触发上拉事件的阈值。
+
+
+:::tip 提示
+当 pullUpLoad 配置为 true 的时候，插件内部使用的是默认的插件选项对象。
+
+```js
+const bs = new BScroll('.wrapper', {
+  pullUpLoad: true
+})
+
+// 相当于
+
+const bs = new BScroll('.wrapper', {
+  pullUpLoad: {
+    threshold: 0
+  }
+})
+```
+:::
+
+## 实例方法
+
+:::tip 提示
+以下方法皆已代理至 BetterScroll 实例，例如：
+
+```js
+import BScroll from '@better-scroll/core'
+import PullUp from '@better-scroll/pull-up'
+
+BScroll.use(PullUp)
+
+const bs = new BScroll('.bs-wrapper', {
+  pullUpLoad: true
+})
+
+bs.finishPullUp()
+bs.openPullUp({})
+bs.closePullUp()
+```
+:::
 
 ### `finishPullUp()`
 
-  - **介绍**：标识一次上拉加载动作结束。
-  - **参数**：无
-  - **返回值**：无
+  - **介绍**：结束上拉加载行为。
 
-::: warning
+  ::: warning 注意
+  每次触发 `pullingUp` 钩子后，你应该**主动调用** `finishPullUp()` 告诉 BetterScroll 准备好下一次的 pullingUp 钩子。
+  :::
 
-注意：**每次触发上拉事件后，在回调函数的最后，都应该调用 `finishPullUp()` 方法。在 `finishPullUp()` 方法调用前不会触发下一次的 `pullingUp` 事件。**
+### `openPullUp(config: PullUpLoadOptions = {})`
 
-:::
+  - **介绍**：动态开启上拉功能。
+  - **参数**：
+    - `{ PullUpLoadOptions } config`：修改 pullup 插件的选项对象
+    - `PullUpLoadOptions`：类型如下
+    ```typescript
+    export type PullUpLoadOptions = Partial<PullUpLoadConfig> | true
 
-### `openPullUp(config: pullUpLoadOptions = true)`
+    export interface PullUpLoadConfig {
+      threshold: number
+    }
+    ```
 
-  - **介绍**：开启上拉加载功能。如果实例化 BetterScroll 时 `pullUpLoad` 配置项不为 `false`，则不需要调用该方法。
-  - **参数**：`config: boolean | { threshold: number }` ，参数为 pullUpLoad 配置项。默认值为 false。
-  - **返回值**：无
+  ::: warning 注意
+  openPullUp 方法应该配合 closePullUp 一起使用，因为在 pullup 插件的生成过程当中，已经**自动监测了上拉加载的动作**。
+  :::
 
 ### `closePullUp()`
 
   - **介绍**：关闭上拉加载功能。
-  - **参数**：无
-  - **返回值**：无
+
+### `autoPullUpLoad()`
+
+  - **介绍**：自动执行上拉加载。
 
 ## 事件
 
 ### `pullingUp`
 
-- **参数**：无
-- **触发时机**：当距离滚动到底部小于 `threshold` 值时，触发一次 `pullingUp` 事件。
+  - **参数**：无
+  - **触发时机**：当距离滚动到底部小于 `threshold` 值时，触发一次 `pullingUp` 事件。
+
+  > 当 threshold 为正数，代表距离滚动边界 threshold 像素的时候触发 `pullingUp`，反之，代表越过滚动边界才会触发事件
+
+  ::: danger 警告
+  监测到上拉刷新的动作之后，`pullingUp` 事件的消费机会只有一次，因此你需要调用 `finishPullUp()` 来告诉 BetterScroll 来提供下一次 `pullingUp` 事件的消费机会。
+  :::

@@ -8,7 +8,7 @@ BetterScroll is implemented with plain JavaScript, which means it's dependency f
 
 ## Demo
 
-<img :src="$withBase('/assets/images/qrcode.png')" alt="demo">
+<img data-zoomable :src="$withBase('/assets/images/qrcode.png')" alt="demo">
 
 ## Getting started
 
@@ -21,11 +21,11 @@ The most common application scenario of BetterScroll is list scrolling. Let's se
     <li>...</li>
     ...
   </ul>
-  <!-- you can put some other DOMs here, it won't affect the scrolling
+  <!-- you can put some other DOMs here, it won't affect the scrolling -->
 </div>
 ```
 
-In the code above, BetterScroll is applied to the outer `wrapper` container, and the scrolling part is `content` element. Pay attention that BetterScroll only handles the scroll of the first child element (content) of the container (`wrapper`), which means other elements will be ignored.
+In the code above, BetterScroll is applied to the outer `wrapper` container, and the scrolling part is `content` element. Pay attention that BetterScroll handles the scroll of the first child element (content) of the container (`wrapper`) by default, which means other elements will be ignored.
 
 The simplest initialization code is as follow:
 
@@ -38,7 +38,11 @@ let scroll = new BScroll(wrapper)
 BetterScroll provides a class whose first parameter is a plain DOM object when instantiated. Certainly, BetterScroll inside would try to use querySelector to get the DOM object.
 
 :::warning
-In BetterScroll 2.X, we split the 1.X-coupled feature into the plugin to achieve on-demand loading and reduce the volume of the package. Therefore, `@better-scroll/core` only provides the most core scrolling capabilities. If you want to implement the **pull-up refresh**, **pull-down load** function, you need to use the corresponding [plugin] (/en-US/plugins).
+In BetterScroll 2.X, we split the 1.X-coupled feature into the plugin to achieve on-demand loading and reduce the volume of the package. Therefore, `@better-scroll/core` only provides the most core scrolling capabilities. If you want to implement the **pull-up load**, **pull-down refresh** function, you need to use the corresponding [plugin] (/en-US/plugins).
+:::
+
+:::tip
+BetterScroll v2.0.4 can use [specifiedIndexAsContent](./base-scroll-options.html#specifiedindexascontent-2-0-4) to specify a child element of the wrapper as BetterScroll's content.
 :::
 
 ## The principle of scrolling
@@ -51,7 +55,7 @@ The phenomenon is 'the content can't scroll' and we need to figure out the root 
 
 The principle of BetterScroll is samed as the browser. We can feel about this more obviously using a picture:
 
-<img :src="$withBase('/assets/images/schematic.png')" alt="schematic">
+<img data-zoomable :src="$withBase('/assets/images/schematic.png')" alt="schematic">
 
 The green part is the wrapper, also known as the parent container, which has **fixed height**. The yellow part is the content, which is **the first child element** of the parent container and whose height would grow with the size of its content. Then, when the height of the content doesn't exceed the height of the parent container, the content would not scroll. Once exceeded, the content can be scrolled. That is the principle of BetterScroll.
 

@@ -1,10 +1,10 @@
-import { Options } from '../Options'
+import { OptionsConstructor } from '../Options'
 
 describe('BetterScroll Options', () => {
-  let options: Options
+  let options: OptionsConstructor
 
   beforeEach(() => {
-    options = new Options()
+    options = new OptionsConstructor()
   })
   afterEach(() => {
     jest.clearAllMocks()
@@ -19,13 +19,13 @@ describe('BetterScroll Options', () => {
         bottom: true,
         left: true,
         right: true,
-        top: true
+        top: true,
       },
       bounceTime: 800,
       click: false,
       dblclick: false,
       deceleration: 0.0015,
-      directionLockThreshold: 5,
+      directionLockThreshold: 0,
       disableMouse: false,
       disableTouch: true,
       eventPassthrough: '',
@@ -37,10 +37,10 @@ describe('BetterScroll Options', () => {
       momentumLimitTime: 300,
       preventDefault: true,
       preventDefaultException: {
-        tagName: /^(INPUT|TEXTAREA|BUTTON|SELECT|AUDIO)$/
+        tagName: /^(INPUT|TEXTAREA|BUTTON|SELECT|AUDIO)$/,
       },
       tagException: {
-        tagName: /^TEXTAREA$/
+        tagName: /^TEXTAREA$/,
       },
       probeType: 0,
       resizePolling: 60,
@@ -52,7 +52,11 @@ describe('BetterScroll Options', () => {
       swipeBounceTime: 500,
       swipeTime: 2500,
       tap: '',
-      useTransition: true
+      useTransition: true,
+      autoEndDistance: 5,
+      bindToTarget: false,
+      outOfBoundaryDampingFactor: 1 / 3,
+      specifiedIndexAsContent: 0,
     })
   })
 
@@ -60,19 +64,24 @@ describe('BetterScroll Options', () => {
     options.merge({
       scrollY: false,
       scrollX: true,
-      bounce: false
+      bounce: false,
     })
 
     expect(options).toEqual({
       HWCompositing: true,
       autoBlur: true,
       bindToWrapper: false,
-      bounce: false,
+      bounce: {
+        top: false,
+        right: false,
+        bottom: false,
+        left: false,
+      },
       bounceTime: 800,
       click: false,
       dblclick: false,
       deceleration: 0.0015,
-      directionLockThreshold: 5,
+      directionLockThreshold: 0,
       disableMouse: false,
       disableTouch: true,
       eventPassthrough: '',
@@ -84,10 +93,10 @@ describe('BetterScroll Options', () => {
       momentumLimitTime: 300,
       preventDefault: true,
       preventDefaultException: {
-        tagName: /^(INPUT|TEXTAREA|BUTTON|SELECT|AUDIO)$/
+        tagName: /^(INPUT|TEXTAREA|BUTTON|SELECT|AUDIO)$/,
       },
       tagException: {
-        tagName: /^TEXTAREA$/
+        tagName: /^TEXTAREA$/,
       },
       probeType: 0,
       resizePolling: 60,
@@ -99,8 +108,15 @@ describe('BetterScroll Options', () => {
       swipeBounceTime: 500,
       swipeTime: 2500,
       tap: '',
-      useTransition: true
+      useTransition: true,
+      autoEndDistance: 5,
+      bindToTarget: false,
+      outOfBoundaryDampingFactor: 1 / 3,
+      specifiedIndexAsContent: 0,
     })
+    // an invalid parameter
+    const ret = options.merge()
+    expect(ret).toBe(options)
   })
 
   it('should generate some extra properties of options', () => {
@@ -114,13 +130,13 @@ describe('BetterScroll Options', () => {
         bottom: true,
         left: true,
         right: true,
-        top: true
+        top: true,
       },
       bounceTime: 800,
       click: false,
       dblclick: false,
       deceleration: 0.0015,
-      directionLockThreshold: 5,
+      directionLockThreshold: 0,
       disableMouse: false,
       disableTouch: true,
       eventPassthrough: '',
@@ -132,10 +148,10 @@ describe('BetterScroll Options', () => {
       momentumLimitTime: 300,
       preventDefault: true,
       preventDefaultException: {
-        tagName: /^(INPUT|TEXTAREA|BUTTON|SELECT|AUDIO)$/
+        tagName: /^(INPUT|TEXTAREA|BUTTON|SELECT|AUDIO)$/,
       },
       tagException: {
-        tagName: /^TEXTAREA$/
+        tagName: /^TEXTAREA$/,
       },
       probeType: 0,
       resizePolling: 60,
@@ -148,35 +164,49 @@ describe('BetterScroll Options', () => {
       swipeTime: 2500,
       tap: '',
       useTransition: true,
-      translateZ: ' translateZ(0)'
+      translateZ: '',
+      autoEndDistance: 5,
+      bindToTarget: false,
+      outOfBoundaryDampingFactor: 1 / 3,
+      specifiedIndexAsContent: 0,
     })
   })
 
   it('should resolve bounce when calling process', () => {
-    options
-      .merge({
-        bounce: false
-      })
-      .process()
+    options.merge({
+      bounce: false,
+    })
 
     expect(options.bounce).toEqual({
       bottom: false,
       left: false,
       right: false,
-      top: false
+      top: false,
     })
 
-    options
-      .merge({
-        bounce: true
-      })
-      .process()
+    options.merge({
+      bounce: true,
+    })
 
     expect(options.bounce).toEqual({
       bottom: true,
       left: true,
       right: true,
-      top: true
+      top: true,
+    })
+
+    options.merge({
+      bounce: {
+        top: false,
+        bottom: false,
+      },
+    })
+
+    expect(options.bounce).toEqual({
+      bottom: false,
+      left: true,
+      right: true,
+      top: false,
     })
   })
 })

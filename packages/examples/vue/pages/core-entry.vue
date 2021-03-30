@@ -7,11 +7,14 @@
       <li class="example-item" @click="goPage('/core/horizontal')">
         <span>horizontal</span>
       </li>
+      <li class="example-item" @click="goPage('/core/dynamic-content')">
+        <span>dynamic-content</span>
+      </li>
+      <li class="example-item" @click="goPage('/core/specified-content')">
+        <span>specified-content</span>
+      </li>
       <li class="example-item" @click="goPage('/core/freescroll')">
         <span>freescroll</span>
-      </li>
-      <li class="example-item" @click="goPage('/core/mouse-wheel')">
-        <span>driven by Mouse wheel</span>
       </li>
     </ul>
     <transition name="move">

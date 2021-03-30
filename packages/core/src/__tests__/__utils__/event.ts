@@ -4,6 +4,18 @@ export function createEvent(type: string, name: string): Event {
   return e
 }
 
+interface CustomClickEvent extends MouseEvent {
+  pageX: number
+  pageY: number
+}
+
+export function dispatchClick(target: EventTarget, name = 'click') {
+  const event = <CustomClickEvent>createEvent('', name)
+  event.pageX = 0
+  event.pageY = 0
+  target.dispatchEvent(event)
+}
+
 interface CustomTouch {
   pageX: number
   pageY: number
@@ -17,7 +29,9 @@ export interface CustomTouchEvent extends Event {
 }
 
 interface CustomMouseEvent extends Event {
-  button: 0
+  button: 0 | 1
+  pageX: number
+  pageY: number
 }
 
 export function dispatchTouch(
@@ -30,9 +44,15 @@ export function dispatchTouch(
   target.dispatchEvent(event)
 }
 
-export function dispatchMouse(target: EventTarget, name = 'mousedown'): void {
+export function dispatchMouse(
+  target: EventTarget,
+  name = 'mousedown',
+  useLeftButton = true
+): void {
   const event = <CustomMouseEvent>createEvent('', name)
-  event.button = 0
+  event.button = useLeftButton ? 0 : 1
+  event.pageX = 0
+  event.pageY = 0
   target.dispatchEvent(event)
 }
 
@@ -55,6 +75,13 @@ export function dispatchTouchEnd(
   touches: CustomTouches
 ): void {
   dispatchTouch(target, 'touchend', touches)
+}
+
+export function dispatchTouchCancel(
+  target: EventTarget,
+  touches: CustomTouches
+): void {
+  dispatchTouch(target, 'touchcancel', touches)
 }
 
 export function dispatchSwipe(

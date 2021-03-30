@@ -2,11 +2,15 @@ import { warn } from './debug'
 import { addEvent, removeEvent } from './dom'
 
 interface Events {
-  [name: string]: [Function, Object][]
+  [name: string]: [WithFnFunction, Object][]
 }
 
 interface EventTypes {
   [type: string]: string
+}
+
+interface WithFnFunction extends Function {
+  fn?: Function
 }
 
 export class EventEmitter {
@@ -18,7 +22,7 @@ export class EventEmitter {
     this.registerType(names)
   }
 
-  on(type: string, fn: Function, context: any = this) {
+  on(type: string, fn: Function, context: Object = this) {
     this.hasType(type)
     if (!this.events[type]) {
       this.events[type] = []
@@ -28,12 +32,14 @@ export class EventEmitter {
     return this
   }
 
-  once(type: string, fn: Function, context: any = this) {
+  once(type: string, fn: Function, context: Object = this) {
     this.hasType(type)
     const magic = (...args: any[]) => {
       this.off(type, magic)
-
-      fn.apply(context, args)
+      const ret = fn.apply(context, args)
+      if (ret === true) {
+        return ret
+      }
     }
     magic.fn = fn
 
@@ -63,7 +69,7 @@ export class EventEmitter {
       while (count--) {
         if (
           events[count][0] === fn ||
-          (events[count][0] && (events[count][0] as any).fn === fn)
+          (events[count][0] && events[count][0].fn === fn)
         ) {
           events.splice(count, 1)
         }
@@ -111,7 +117,7 @@ export class EventEmitter {
     if (!isType) {
       warn(
         `EventEmitter has used unknown event type: "${type}", should be oneof [` +
-          `${Object.keys(types).map(_ => JSON.stringify(_))}` +
+          `${Object.keys(types).map((_) => JSON.stringify(_))}` +
           `]`
       )
     }

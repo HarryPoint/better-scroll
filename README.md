@@ -1,27 +1,74 @@
 # better-scroll
 
-[![npm version](https://img.shields.io/npm/v/better-scroll.svg)](https://www.npmjs.com/package/better-scroll) [![npm next Version](https://badgen.net/npm/v/better-scroll/next)](https://www.npmjs.com/package/better-scroll) [![downloads](https://img.shields.io/npm/dm/better-scroll.svg)](https://www.npmjs.com/package/better-scroll) [![Build Status](https://travis-ci.org/ustbhuangyi/better-scroll.svg?branch=master)](https://travis-ci.org/ustbhuangyi/better-scroll)  [![Package Quality](http://npm.packagequality.com/shield/better-scroll.svg)](http://packagequality.com/#?package=better-scroll) [![codecov.io](http://codecov.io/github/ustbhuangyi/better-scroll/coverage.svg?branch=master)](http://codecov.io/github/ustbhuangyi/better-scroll)
+<img src="https://dpubstatic.udache.com/static/dpubimg/t_L6vAgQ-E/logo.svg">
+
+[![npm version](https://img.shields.io/npm/v/better-scroll.svg)](https://www.npmjs.com/package/better-scroll) [![downloads](https://img.shields.io/npm/dm/better-scroll.svg)](https://www.npmjs.com/package/better-scroll) [![Build Status](https://travis-ci.org/ustbhuangyi/better-scroll.svg?branch=master)](https://travis-ci.org/ustbhuangyi/better-scroll)  [![Package Quality](http://npm.packagequality.com/shield/better-scroll.svg)](http://packagequality.com/#?package=better-scroll) [![codecov.io](http://codecov.io/github/ustbhuangyi/better-scroll/coverage.svg?branch=master)](http://codecov.io/github/ustbhuangyi/better-scroll)
 
 [中文文档](https://github.com/ustbhuangyi/better-scroll/blob/master/README_zh-CN.md)
 
-[1.x Docs](https://ustbhuangyi.github.io/better-scroll/#/)
+[1.x Docs](https://better-scroll.github.io/docs-v1/)
 
 [2.x Docs](https://better-scroll.github.io/docs/en-US/)
 
-> **Note**: The following code is the syntax of `2.x`.
+[2.x Demo](https://better-scroll.github.io/examples/)
+
+> **Note**: `1.x` is not maintained. please migrate your version as soon as possible
 
 # Install
 
 ```bash
-npm install better-scroll -S # install 1.x
-npm install better-scroll@next -S # install 2.x，with full-featured plugin.
+npm install better-scroll -S # install 2.x，with full-featured plugin.
+
+npm install @better-scroll/core # only CoreScroll
 ```
 
-or include it directly via CDN
+```js
+import BetterScroll from 'better-scroll'
+
+let bs = new BetterScroll('.wrapper', {
+  movable: true,
+  zoom: true
+})
+
+import BScroll from '@better-scroll/core'
+
+let bs = new BScroll('.wrapper', {})
+```
+
+# CDN
+
+BetterScroll with full-featured plugin.
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/better-scroll"></script>
+<script src="https://unpkg.com/better-scroll@latest/dist/better-scroll.js"></script>
+
+<!-- minify -->
+<script src="https://unpkg.com/better-scroll@latest/dist/better-scroll.min.js"></script>
 ```
+
+```js
+let wrapper = document.getElementById("wrapper")
+let bs = BetterScroll.createBScroll(wrapper, {})
+```
+
+
+Only CoreScroll
+
+```html
+<script src="https://unpkg.com/@better-scroll/core@latest/dist/core.js"></script>
+
+<!-- minify -->
+<script src="https://unpkg.com/@better-scroll/core@latest/dist/core.min.js"></script>
+```
+
+```js
+let wrapper = document.getElementById("wrapper")
+let bs = new BScroll(wrapper, {})
+```
+
+## Wechat
+
+<img src="" />
 
 ## What is BetterScroll ?
 
@@ -44,7 +91,7 @@ The most common application scenario of BetterScroll is list scrolling. Let's se
 </div>
 ```
 
-In the code above, BetterScroll is applied to the outer `wrapper` container, and the scrolling part is `content` element. Pay attention that BetterScroll only handles the scroll of the first child element (content) of the container (`wrapper`), which means other elements will be ignored.
+In the code above, BetterScroll is applied to the outer `wrapper` container, and the scrolling part is `content` element. Pay attention that BetterScroll handles the scroll of the first child element (content) of the container (`wrapper`) by default, which means other elements will be ignored. However, for BetterScroll v2.0.4, content can be specified through the `specifiedIndexAsContent` option. Please refer to the docs for details.
 
 The simplest initialization code is as follow:
 

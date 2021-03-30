@@ -4,11 +4,10 @@ import {
   preventDefaultExceptionFn,
   tagExceptionFn,
   eventTypeMap,
-  hasTouch,
   EventType,
   MouseButton,
   EventRegister,
-  EventEmitter
+  EventEmitter,
 } from '@better-scroll/shared-utils'
 
 type Exception = {
@@ -26,7 +25,7 @@ export interface Options {
   stopPropagation: boolean
   preventDefaultException: Exception
   tagException: Exception
-  momentumLimitDistance: number
+  autoEndDistance: number
 }
 
 export default class ActionsHandler {
@@ -42,7 +41,7 @@ export default class ActionsHandler {
       'start',
       'move',
       'end',
-      'click'
+      'click',
     ])
     this.handleDOMEvents()
   }
@@ -53,35 +52,35 @@ export default class ActionsHandler {
     const target = bindToWrapper ? wrapper : window
     const wrapperEvents = []
     const targetEvents = []
-    const shouldRegisterTouch = hasTouch && !disableTouch
+    const shouldRegisterTouch = !disableTouch
     const shouldRegisterMouse = !disableMouse
 
     if (click) {
       wrapperEvents.push({
         name: 'click',
         handler: this.click.bind(this),
-        capture: true
+        capture: true,
       })
     }
 
     if (shouldRegisterTouch) {
       wrapperEvents.push({
         name: 'touchstart',
-        handler: this.start.bind(this)
+        handler: this.start.bind(this),
       })
 
       targetEvents.push(
         {
           name: 'touchmove',
-          handler: this.move.bind(this)
+          handler: this.move.bind(this),
         },
         {
           name: 'touchend',
-          handler: this.end.bind(this)
+          handler: this.end.bind(this),
         },
         {
           name: 'touchcancel',
-          handler: this.end.bind(this)
+          handler: this.end.bind(this),
         }
       )
     }
@@ -89,17 +88,17 @@ export default class ActionsHandler {
     if (shouldRegisterMouse) {
       wrapperEvents.push({
         name: 'mousedown',
-        handler: this.start.bind(this)
+        handler: this.start.bind(this),
       })
 
       targetEvents.push(
         {
           name: 'mousemove',
-          handler: this.move.bind(this)
+          handler: this.move.bind(this),
         },
         {
           name: 'mouseup',
-          handler: this.end.bind(this)
+          handler: this.end.bind(this),
         }
       )
     }
@@ -111,7 +110,7 @@ export default class ActionsHandler {
     const {
       preventDefault,
       stopPropagation,
-      preventDefaultException
+      preventDefaultException,
     } = this.options
 
     const preventDefaultConditions = {
@@ -129,7 +128,7 @@ export default class ActionsHandler {
       },
       move: () => {
         return preventDefault
-      }
+      },
     }
     if (preventDefaultConditions[type]()) {
       e.preventDefault()
@@ -159,7 +158,7 @@ export default class ActionsHandler {
       return
     }
 
-    // no mouse left button
+    // only allow mouse left button
     if (_eventType === EventType.Mouse && e.button !== MouseButton.Left) return
 
     if (this.hooks.trigger(this.hooks.eventTypes.beforeStart, e)) {
@@ -192,13 +191,13 @@ export default class ActionsHandler {
       this.hooks.trigger(this.hooks.eventTypes.move, {
         deltaX,
         deltaY,
-        e
+        e,
       })
     ) {
       return
     }
 
-    // auto end when out of wrapper
+    // auto end when out of viewport
     let scrollLeft =
       document.documentElement.scrollLeft ||
       window.pageXOffset ||
@@ -211,15 +210,12 @@ export default class ActionsHandler {
     let pX = this.pointX - scrollLeft
     let pY = this.pointY - scrollTop
 
+    const autoEndDistance = this.options.autoEndDistance
     if (
-      pX >
-        document.documentElement.clientWidth -
-          this.options.momentumLimitDistance ||
-      pX < this.options.momentumLimitDistance ||
-      pY < this.options.momentumLimitDistance ||
-      pY >
-        document.documentElement.clientHeight -
-          this.options.momentumLimitDistance
+      pX > document.documentElement.clientWidth - autoEndDistance ||
+      pY > document.documentElement.clientHeight - autoEndDistance ||
+      pX < autoEndDistance ||
+      pY < autoEndDistance
     ) {
       this.end(e)
     }
@@ -237,6 +233,19 @@ export default class ActionsHandler {
 
   private click(e: TouchEvent) {
     this.hooks.trigger(this.hooks.eventTypes.click, e)
+  }
+
+  setContent(content: HTMLElement) {
+    if (content !== this.wrapper) {
+      this.wrapper = content
+      this.rebindDOMEvents()
+    }
+  }
+
+  rebindDOMEvents() {
+    this.wrapperEventRegister.destroy()
+    this.targetEventRegister.destroy()
+    this.handleDOMEvents()
   }
 
   destroy() {

@@ -2,7 +2,7 @@
 
 ## Why need plugins
 
-Plugins make it easier to add additional features to BetterScroll 2.0. Some features, such as pulldown and pullup, are implemented through plugins.
+In order to decouple the functions of the various features of BetterScroll 1.x, to prevent unlimited increase in the size of the bundle. In the `2.x` architecture design, a "plugin" architecture design is adopted. Each feature of 1.x will be implemented in the form of Plugin in `2.x`.
 
 Existing plugins:
 - [pulldown](./pulldown.html)
@@ -13,24 +13,32 @@ Existing plugins:
 - [zoom](./zoom.html)
 - [mouse-wheel](./mouse-wheel.html)
 - [observe-dom](./observe-dom.html)
+- [observe-image](./observe-image.html)
+- [nested-scroll](./nested-scroll.html)
+- [infinity](./infinity.html)
+- [movable](./movable.html)
+- [indicators](./indicators.html)
 
 You can write a plugin by yourself to add new feature to `bs`. If you want do this, please refer to [How to write a plugin](./how-to-write.html).
 
 ## Use a plugin
 
-Use plugins by calling the `BScroll.use()` global method. This has to be done before you call `new BScroll()`:
+Use plugins by calling the `BScroll.use()` static method. This has to be done before you call `new BScroll()`:
 
 ```js
   import BScroll from '@better-scroll/core'
   import Plugin from 'somewhere'
 
-  BScroll.use(Plugin)
-  new BScroll(/*arguments*/)
+  new BScroll('.wrapper', {
+    // pluginKey corresponds to the value of the static attribute pluginName on the Plugin class,
+    // otherwise the plugin cannot be instantiated
+    pluginKey: {}
+  })
 ```
 
-## Use a function or property of plugins
+## Use a method or property of plugins
 
-Some methods or properties may be exposed in the plugin. These methods or properties are proxied to `bs` via `Object.defineProperty` method. For example, the `zoomTo` method is provided in the zoom plugin, which you can use in the following ways:
+The plugin may expose some methods or properties. These methods or properties are proxied to `bs` via `Object.defineProperty` method. For example, the `zoomTo` method is provided in the zoom plugin, which you can use by `bs.zoomTo`.
 
 ```js
   import BScroll from '@better-scroll/core'
@@ -51,12 +59,12 @@ Some methods or properties may be exposed in the plugin. These methods or proper
     }
   })
 
-  bs.zoomTo(1.5, 0, 0) // use zoomTo
+  bs.zoomTo(1.5, 0, 0) // zoomTo from Zoom Plugin is proxied to bs instance
 ```
 
-## Use a hook of plugins
+## Use a event of plugins
 
-The hooks exposed in the plugin will be delegated to `bs`. For example, you can listen to the `zoomStart` hook, which is exposed in zoom plugin, in the following way:
+The hooks exposed in the plugin will be delegated to `bs`. For example, you can listen to the `zoomStart` event, which is exposed in zoom plugin, in the following way:
 
 ```js
   import BScroll from '@better-scroll/core'
@@ -67,8 +75,6 @@ The hooks exposed in the plugin will be delegated to `bs`. For example, you can 
     freeScroll: true,
     scrollX: true,
     scrollY: true,
-    disableMouse: true,
-    useTransition: true,
     zoom: {
       start: 1,
       min: 0.5,
@@ -76,12 +82,14 @@ The hooks exposed in the plugin will be delegated to `bs`. For example, you can 
     }
   })
 
-  bs.on('zoomStart', zoomStartHandler)
+  bs.on('zoomStart', () => {
+
+  })
 ```
 
-## BetterScroll with all plugin capabilities
+## BetterScroll with all plugins
 
-Considering the trouble of registering plugins one by one, if your project uses the full plugin capabilities of BetterScroll, we offer a once-in-a-lifetime solution.
+Considering the trouble of registering plugins one by one, if your project uses the full plugins of BetterScroll, we offer a once-in-a-lifetime solution.
 
 
 ```js
@@ -94,3 +102,24 @@ Considering the trouble of registering plugins one by one, if your project uses 
     // and so on
   })
 ```
+
+::: warning
+import all of BetterScroll may have a big impact on the size of your bundle, and as the function of BetterScroll expands, the size will increase unlimitedly, **try to import what you need**.
+:::
+
+::: warning
+Normally, you should pay attention to the properties and methods exposed by the BetterScroll instance, because the properties and methods on the plugin instance have been proxied to the bs. If you really need to care about the plugin instance, you can also use `bs.plugins ` to get all plugin information.
+
+```js
+  import BScroll from '@better-scroll/scroll'
+  import zoom from '@better-scroll/zoom'
+
+  BScroll.use(zoom)
+
+  const bs = new BScroll('.wrapper', {
+    zoom: true
+  })
+
+  console.log(bs.plugins.zoom)
+```
+:::

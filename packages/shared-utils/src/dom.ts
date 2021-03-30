@@ -1,4 +1,4 @@
-import { inBrowser, isWeChatDevTools } from './env'
+import { inBrowser, isWeChatDevTools, supportsPassive } from './env'
 import { extend } from './lang'
 
 export type safeCSSStyleDeclaration = {
@@ -16,28 +16,42 @@ let elementStyle = (inBrowser &&
   document.createElement('div').style) as safeCSSStyleDeclaration
 
 let vendor = (() => {
+  /* istanbul ignore if  */
   if (!inBrowser) {
     return false
   }
-  let transformNames: {
-    [prefix: string]: string
-  } = {
-    webkit: 'webkitTransform',
-    Moz: 'MozTransform',
-    O: 'OTransform',
-    ms: 'msTransform',
-    standard: 'transform'
-  }
-
-  for (let key in transformNames) {
-    if (elementStyle[transformNames[key]] !== undefined) {
-      return key
+  const transformNames = [
+    {
+      key: 'standard',
+      value: 'transform',
+    },
+    {
+      key: 'webkit',
+      value: 'webkitTransform',
+    },
+    {
+      key: 'Moz',
+      value: 'MozTransform',
+    },
+    {
+      key: 'O',
+      value: 'OTransform',
+    },
+    {
+      key: 'ms',
+      value: 'msTransform',
+    },
+  ]
+  for (let obj of transformNames) {
+    if (elementStyle[obj.value] !== undefined) {
+      return obj.key
     }
   }
-
+  /* istanbul ignore next  */
   return false
 })()
 
+/* istanbul ignore next  */
 function prefixStyle(style: string): string {
   if (vendor === false) {
     return style
@@ -65,10 +79,13 @@ export function addEvent(
   fn: EventListenerOrEventListenerObject,
   capture?: AddEventListenerOptions
 ) {
-  el.addEventListener(type, fn, {
-    passive: false,
-    capture: !!capture
-  })
+  const useCapture = supportsPassive
+    ? {
+        passive: false,
+        capture: !!capture,
+      }
+    : !!capture
+  el.addEventListener(type, fn, useCapture)
 }
 
 export function removeEvent(
@@ -78,7 +95,7 @@ export function removeEvent(
   capture?: EventListenerOptions
 ) {
   el.removeEventListener(type, fn, {
-    capture: !!capture
+    capture: !!capture,
   })
 }
 
@@ -94,7 +111,7 @@ export function offset(el: HTMLElement | null) {
 
   return {
     left,
-    top
+    top,
   }
 }
 
@@ -103,7 +120,7 @@ export function offsetToBody(el: HTMLElement) {
 
   return {
     left: -(rect.left + window.pageXOffset),
-    top: -(rect.top + window.pageYOffset)
+    top: -(rect.top + window.pageYOffset),
   }
 }
 
@@ -127,7 +144,8 @@ export const style = {
   transitionDuration: prefixStyle('transitionDuration'),
   transitionDelay: prefixStyle('transitionDelay'),
   transformOrigin: prefixStyle('transformOrigin'),
-  transitionEnd: prefixStyle('transitionEnd')
+  transitionEnd: prefixStyle('transitionEnd'),
+  transitionProperty: prefixStyle('transitionProperty'),
 }
 
 export const eventTypeMap: {
@@ -135,6 +153,7 @@ export const eventTypeMap: {
   touchstart: number
   touchmove: number
   touchend: number
+  touchcancel: number
   mousedown: number
   mousemove: number
   mouseup: number
@@ -142,27 +161,29 @@ export const eventTypeMap: {
   touchstart: 1,
   touchmove: 1,
   touchend: 1,
+  touchcancel: 1,
 
   mousedown: 2,
   mousemove: 2,
-  mouseup: 2
+  mouseup: 2,
 }
 
 export function getRect(el: HTMLElement): DOMRect {
+  /* istanbul ignore if  */
   if (el instanceof (window as any).SVGElement) {
     let rect = el.getBoundingClientRect()
     return {
       top: rect.top,
       left: rect.left,
       width: rect.width,
-      height: rect.height
+      height: rect.height,
     }
   } else {
     return {
       top: el.offsetTop,
       left: el.offsetLeft,
       width: el.offsetWidth,
-      height: el.offsetHeight
+      height: el.offsetHeight,
     }
   }
 }
@@ -215,6 +236,13 @@ export function click(e: any, event = 'click') {
   let ev: any
   const bubbles = true
   const cancelable = true
+  const { ctrlKey, shiftKey, altKey, metaKey } = e
+  const pressedKeysMap = {
+    ctrlKey,
+    shiftKey,
+    altKey,
+    metaKey,
+  }
   if (typeof MouseEvent !== 'undefined') {
     try {
       ev = new MouseEvent(
@@ -222,12 +250,14 @@ export function click(e: any, event = 'click') {
         extend(
           {
             bubbles,
-            cancelable
+            cancelable,
+            ...pressedKeysMap,
           },
           posSrc
         )
       )
     } catch (e) {
+      /* istanbul ignore next */
       createEvent()
     }
   } else {
@@ -260,7 +290,8 @@ export function prepend(el: HTMLElement, target: HTMLElement) {
 }
 
 export function before(el: HTMLElement, target: HTMLElement) {
-  ;(target.parentNode as HTMLElement).insertBefore(el, target)
+  const parentNode = target.parentNode as HTMLElement
+  parentNode.insertBefore(el, target)
 }
 
 export function removeChild(el: HTMLElement, child: HTMLElement) {
@@ -289,4 +320,15 @@ export function removeClass(el: HTMLElement, className: string) {
 
   let reg = new RegExp('(^|\\s)' + className + '(\\s|$)', 'g')
   el.className = el.className.replace(reg, ' ')
+}
+
+export function HTMLCollectionToArray(el: HTMLCollection) {
+  return Array.prototype.slice.call(el, 0)
+}
+
+export function getClientSize(el: HTMLElement) {
+  return {
+    width: el.clientWidth,
+    height: el.clientHeight,
+  }
 }

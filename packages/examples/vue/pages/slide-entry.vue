@@ -10,11 +10,10 @@
       <li class="example-item" @click="goPage('/slide/vertical')">
           <span>vertical slider</span>
       </li>
-      <li class="example-item" @click="goPage('/slide/pc')">
-          <span>Mouse Wheel slider</span>
+      <li class="example-item" @click="goPage('/slide/dynamic')">
+          <span>dynamic slider（v2.1.0）</span>
       </li>
-      <li class="example-item placeholder">
-      </li>
+      <li class="example-item placeholder"></li>
     </ul>
     <transition name="move">
       <router-view class="view"></router-view>

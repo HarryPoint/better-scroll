@@ -1,7 +1,7 @@
-import Behavior from '../Behavior'
+import { Behavior } from '../Behavior'
 import createAnimater from '../../animater'
 import Translater from '../../translater'
-import { Options } from '../../Options'
+import { OptionsConstructor } from '../../Options'
 import ActionsHandler from '../../base/ActionsHandler'
 import Actions from '../Actions'
 
@@ -27,15 +27,15 @@ describe('Scroller Class tests', () => {
     Object.defineProperty(window, 'performance', {
       get() {
         return undefined
-      }
+      },
     })
     wrapper = createDiv(100, 200, 0, 0)
     content = createDiv(100, 400, 0, 0)
     document.body.appendChild(content)
     wrapper.appendChild(content)
-    let bscrollOptions = new Options() as any
+    let bscrollOptions = new OptionsConstructor() as any
 
-    scroller = new Scroller(wrapper, bscrollOptions)
+    scroller = new Scroller(wrapper, content, bscrollOptions)
   })
 
   it('should init hooks when call constructor function', () => {
@@ -47,14 +47,16 @@ describe('Scroller Class tests', () => {
       'scroll',
       'beforeEnd',
       'scrollEnd',
-      'refresh',
+      'resize',
+      'beforeRefresh',
       'touchEnd',
       'flick',
       'scrollCancel',
       'momentum',
       'scrollTo',
-      'scrollToElement'
-    ].forEach(key => {
+      'scrollToElement',
+      'minDistanceScroll',
+    ].forEach((key) => {
       expect(scroller.hooks.eventTypes).toHaveProperty(key)
     })
   })
@@ -68,6 +70,12 @@ describe('Scroller Class tests', () => {
     })
 
     it('should bind translate hook', () => {
+      scroller.actions.getCurrentPos = jest.fn().mockImplementation(() => {
+        return {
+          x: 0,
+          y: 0,
+        }
+      })
       scroller.translater.hooks.trigger('translate', { x: 0, y: -20 })
 
       expect(scroller.scrollBehaviorX.updatePosition).toBeCalled()
@@ -82,15 +90,16 @@ describe('Scroller Class tests', () => {
     it('should bind end hook ', () => {
       let pos = {
         x: 0,
-        y: 20
+        y: 20,
       }
       let scrollEndMockHandler = jest.fn()
+      scroller.hooks.on('scrollEnd', scrollEndMockHandler)
       scroller.scrollBehaviorX.checkInBoundary = jest
         .fn()
         .mockImplementation(() => {
           return {
             position: 0,
-            inBoundary: true
+            inBoundary: true,
           }
         })
       scroller.scrollBehaviorY.checkInBoundary = jest
@@ -98,18 +107,15 @@ describe('Scroller Class tests', () => {
         .mockImplementation(() => {
           return {
             position: 0,
-            inBoundary: true
+            inBoundary: true,
           }
         })
-      scroller.hooks.on('scrollEnd', scrollEndMockHandler)
       scroller.animater.hooks.trigger('end', pos)
 
-      expect(scroller.animater.setPending).toBeCalled()
       expect(scroller.animater.setPending).toHaveBeenCalledWith(false)
-      expect(scrollEndMockHandler).toBeCalled()
       expect(scrollEndMockHandler).toHaveBeenCalledWith({
         x: 0,
-        y: 20
+        y: 20,
       })
     })
 
@@ -130,62 +136,163 @@ describe('Scroller Class tests', () => {
     it('bind end hook', () => {
       let touchEndMockHandler = jest.fn()
       let e = new Event('touch') as any
-      scroller.hooks.on('touchEnd', touchEndMockHandler)
-      scroller.hooks.trigger('touchEnd', { x: 0, y: 0 })
-      scroller.actions.hooks.trigger('end', e, { x: 0, y: 0 })
+      Object.defineProperty(e, 'target', {
+        get() {
+          return scroller.wrapper
+        },
+      })
+      // cancelable scroller end hook
+      scroller.hooks.on(scroller.hooks.eventTypes.touchEnd, touchEndMockHandler)
+      scroller.hooks.trigger(scroller.hooks.eventTypes.touchEnd, { x: 0, y: 0 })
+      scroller.hooks.on(
+        scroller.hooks.eventTypes.end,
+        jest.fn().mockImplementationOnce(() => true)
+      )
+      const ret = scroller.actions.hooks.trigger(
+        scroller.actions.hooks.eventTypes.end,
+        e,
+        { x: 0, y: 0 }
+      )
 
+      expect(ret).toBe(true)
       expect(touchEndMockHandler).toBeCalled()
       expect(touchEndMockHandler).toHaveBeenCalledWith({
         x: 0,
-        y: 0
+        y: 0,
       })
-      expect(scroller.animater.setForceStopped).toBeCalled()
-      expect(scroller.animater.setForceStopped).toHaveBeenCalledWith(false)
+
+      /* click operation */
+      // case 1
+
+      scroller.hooks.on(
+        scroller.hooks.eventTypes.checkClick,
+        jest.fn().mockImplementationOnce(() => true)
+      )
+      scroller.actions.hooks.trigger(scroller.actions.hooks.eventTypes.end, e, {
+        x: 0,
+        y: 0,
+      })
+
+      expect(scroller.animater.setForceStopped).toBeCalledWith(false)
+
+      // case 2 dblclick
+      const mockFn2 = jest.fn()
+      scroller.options.dblclick = true
+      scroller.lastClickTime = Date.now()
+      scroller.wrapper.addEventListener('dblclick', mockFn2)
+      scroller.actions.hooks.trigger(scroller.actions.hooks.eventTypes.end, e, {
+        x: 0,
+        y: 0,
+      })
+      expect(mockFn2).toBeCalled()
+
+      // case 3 tap
+      const mockFn3 = jest.fn()
+      scroller.options.tap = 'tap'
+      scroller.wrapper.addEventListener('tap', mockFn3)
+      scroller.actions.hooks.trigger(scroller.actions.hooks.eventTypes.end, e, {
+        x: 0,
+        y: 0,
+      })
+      expect(mockFn3).toBeCalled()
+
+      // case 4 click
+      const mockFn4 = jest.fn()
+      scroller.options.click = true
+      scroller.wrapper.addEventListener('click', mockFn4)
+      scroller.actions.hooks.trigger(scroller.actions.hooks.eventTypes.end, e, {
+        x: 0,
+        y: 0,
+      })
+      expect(mockFn4).toBeCalled()
+
+      // case 5 force stopped
+      scroller.animater.forceStopped = true
+      const ret2 = scroller.actions.hooks.trigger(
+        scroller.actions.hooks.eventTypes.end,
+        e,
+        { x: 0, y: 0 }
+      )
+      expect(ret2).toBe(true)
     })
 
     it('bind scrollEnd hook', () => {
-      let scrollEndMockHandler = jest.fn()
       let momentumMockHandler = jest.fn()
       let noop = (() => {}) as any
-      scroller.hooks.on('scrollEnd', scrollEndMockHandler)
       scroller.hooks.on('momentum', momentumMockHandler)
-      scroller.hooks.events['flick'] = [noop]
       scroller.scrollBehaviorX.end = jest.fn().mockImplementation(() => {
         return {
-          duration: 400
+          duration: 400,
+          destination: 0,
         }
       })
       scroller.scrollBehaviorY.end = jest.fn().mockImplementation(() => {
         return {
-          duration: 400
+          duration: 400,
+          destination: -20,
         }
       })
-      scroller.actions.hooks.trigger('scrollEnd', { x: 0, y: -20 }, 50)
-
-      expect(scrollEndMockHandler).toBeCalled()
-      expect(momentumMockHandler).toBeCalled()
-      expect(momentumMockHandler).toHaveBeenCalledWith(
-        {
-          easing: undefined,
-          newX: 0,
-          newY: -20,
-          time: 400
-        },
-        expect.anything()
+      // flick
+      const mockFn = jest.fn()
+      scroller.hooks.events['flick'] = [noop, noop]
+      scroller.hooks.on(scroller.hooks.eventTypes.flick, mockFn)
+      scroller.actions.hooks.trigger(
+        scroller.actions.hooks.eventTypes.scrollEnd,
+        { x: 0, y: -20 },
+        50
       )
+      expect(mockFn).toBeCalled()
+
+      // momentum
+      scroller.hooks.events['flick'] = []
+      scroller.actions.hooks.trigger(
+        scroller.actions.hooks.eventTypes.scrollEnd,
+        { x: 0, y: -40 },
+        50
+      )
+      expect(scroller.animater.setForceStopped).toBeCalledWith(false)
+
+      // force stop from transition
+      scroller.actions.contentMoved = false
+      scroller.animater.forceStopped = true
+      scroller.actions.hooks.trigger(
+        scroller.actions.hooks.eventTypes.scrollEnd,
+        { x: 0, y: -20 },
+        50
+      )
+      expect(scroller.animater.setForceStopped).toBeCalledWith(false)
+
+      const mockFn2 = jest.fn()
+      scroller.actions.contentMoved = true
+      scroller.hooks.on(scroller.hooks.eventTypes.scrollEnd, mockFn2)
+      scroller.actions.hooks.trigger(
+        scroller.actions.hooks.eventTypes.scrollEnd,
+        { x: 0, y: -20 },
+        50
+      )
+      expect(mockFn2).toBeCalledWith({
+        x: 0,
+        y: -20,
+      })
     })
   })
 
   it('should invoke resize method when window is resized', () => {
     jest.useFakeTimers()
-    scroller.refresh = jest.fn()
+    const mockFn = jest.fn()
+    scroller.hooks.on(scroller.hooks.eventTypes.resize, mockFn)
     const resizeEvent = document.createEvent('Event')
     resizeEvent.initEvent('resize', true, true)
     window.dispatchEvent(resizeEvent)
     jest.advanceTimersByTime(60)
     jest.clearAllTimers()
+    expect(mockFn).toBeCalledTimes(1)
 
-    expect(scroller.refresh).toBeCalled()
+    // disable scroller
+    scroller.actions.enabled = false
+    resizeEvent.initEvent('resize', true, true)
+    window.dispatchEvent(resizeEvent)
+    expect(mockFn).toBeCalledTimes(1)
   })
 
   it('should trigger scrollTo hook when invoking scrollTo method', () => {
@@ -194,35 +301,37 @@ describe('Scroller Class tests', () => {
     scroller.actions.getCurrentPos = jest.fn().mockImplementation(() => {
       return {
         x: 0,
-        y: 0
+        y: 0,
       }
     })
-    scroller.scrollTo(0, -20)
+    scroller.scrollTo(0, -20, 800)
 
     expect(scrollToMockHandler).toBeCalledWith({
       x: 0,
-      y: -20
+      y: -20,
     })
     expect(scroller.animater.move).toBeCalledWith(
       {
         x: 0,
-        y: 0
+        y: 0,
       },
       {
         x: 0,
-        y: -20
+        y: -20,
       },
-      0,
-      expect.anything(),
-      undefined
+      800,
+      'cubic-bezier(0.165, 0.84, 0.44, 1)'
     )
   })
 
-  it('should trigger scrollToElement hook when scrollToElement method', () => {
+  it('scrollToElement()', () => {
     let scrollToElementMockHandler = jest.fn()
-    scroller.hooks.on('scrollToElement', scrollToElementMockHandler)
+    scroller.hooks.on(
+      scroller.hooks.eventTypes.scrollToElement,
+      scrollToElementMockHandler
+    )
 
-    scroller.refresh()
+    scroller.refresh(scroller.content)
     scroller.scrollBehaviorX.adjustPosition = jest.fn(() => {
       return 0
     })
@@ -232,18 +341,38 @@ describe('Scroller Class tests', () => {
     scroller.actions.getCurrentPos = jest.fn().mockImplementation(() => {
       return {
         x: 0,
-        y: 0
+        y: 0,
       }
     })
 
     scroller.scrollToElement(content, 0, false, false)
-    expect(scrollToElementMockHandler).toHaveBeenCalledWith(content, {
+    expect(scrollToElementMockHandler).toBeCalled()
+    // to a specified position
+    scroller.scrollToElement(content, 0, 0, 0)
+    expect(scrollToElementMockHandler).toHaveBeenLastCalledWith(content, {
       left: 0,
-      top: 0
+      top: 0,
+    })
+
+    const mockFn2 = jest.fn()
+    scroller.hooks.on(scroller.hooks.eventTypes.scrollToElement, () => true)
+    scroller.hooks.on(scroller.hooks.eventTypes.scrollToElement, mockFn2)
+    scroller.scrollToElement(content, 0, 0, 0)
+
+    expect(mockFn2).not.toBeCalled()
+  })
+
+  it('scrollBy ', () => {
+    const mockFn = jest.fn()
+    scroller.hooks.on(scroller.hooks.eventTypes.scrollTo, mockFn)
+    scroller.scrollBy(20, 20)
+    expect(mockFn).toBeCalledWith({
+      x: 20,
+      y: 20,
     })
   })
 
-  it('should enable or disable when call enable or disable method', () => {
+  it('enable() & disable()', () => {
     scroller.disable()
     expect(scroller.actions.enabled).toBe(false)
 
@@ -254,22 +383,24 @@ describe('Scroller Class tests', () => {
   it('should update postions when invoking updatePositions method', () => {
     scroller.updatePositions({
       x: 20,
-      y: -20
+      y: -20,
     })
 
     expect(scroller.scrollBehaviorX.updatePosition).toHaveBeenCalledWith(20)
     expect(scroller.scrollBehaviorY.updatePosition).toHaveBeenCalledWith(-20)
   })
 
-  it('should invoking refresh method', () => {
-    scroller.refresh()
+  it('refresh()', () => {
+    scroller.options.bindToTarget = true
+    scroller.refresh(document.createElement('p'))
 
     expect(scroller.scrollBehaviorX.refresh).toBeCalled()
     expect(scroller.scrollBehaviorY.refresh).toBeCalled()
     expect(scroller.actions.refresh).toBeCalled()
+    expect(scroller.actionsHandler.setContent).toBeCalled()
   })
 
-  it('should invoking destroy method', () => {
+  it('destroy()', () => {
     scroller.destroy()
     const keys = [
       'actionsHandler',
@@ -277,10 +408,32 @@ describe('Scroller Class tests', () => {
       'animater',
       'translater',
       'scrollBehaviorX',
-      'scrollBehaviorY'
+      'scrollBehaviorY',
     ]
-    keys.forEach(key => {
+    keys.forEach((key) => {
       expect(scroller[key].destroy).toBeCalled()
     })
+  })
+
+  it('resetPosition() ', () => {
+    const mockFn = jest.fn()
+    scroller.hooks.on(scroller.hooks.eventTypes.scrollTo, mockFn)
+    scroller.resetPosition()
+    expect(mockFn).toBeCalledWith({
+      x: 0,
+      y: 0,
+    })
+  })
+  it('scrollTo()', () => {
+    // minDistanceScroll
+    const mockFn = jest.fn()
+    scroller.hooks.on(scroller.hooks.eventTypes.minDistanceScroll, mockFn)
+
+    scroller.scrollTo(0, 0.5, 300)
+  })
+  it('should not toggle pointer-events when casting last position into integer in touchend handlers', () => {
+    scroller.actions.ensuringInteger = true
+    scroller.translater.hooks.trigger('translate', { x: 0, y: -20 })
+    expect(scroller.actions.ensuringInteger).toBe(false)
   })
 })

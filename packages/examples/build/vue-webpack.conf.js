@@ -7,9 +7,11 @@ const FriendlyErrorsPlugin = require('friendly-errors-webpack-plugin')
 const webpackBar = require('webpackbar')
 const CopyWebpackPlugin = require('copy-webpack-plugin')
 const OptimizeCSSPlugin = require('optimize-css-assets-webpack-plugin')
-const UglifyJsPlugin = require('uglifyjs-webpack-plugin')
+const TerserPlugin = require('terser-webpack-plugin')
 const path = require('path')
 const fs = require('fs')
+const { e2e } = require('yargs').argv
+const execa = require('execa')
 const isProd = process.env.NODE_ENV === 'production'
 
 function resolve(dir) {
@@ -17,7 +19,7 @@ function resolve(dir) {
 }
 
 const webpackConfig = new Config()
-
+console.log('-----', isProd)
 webpackConfig
   .mode(isProd ? 'production' : 'development')
   .devtool(isProd ? 'false' : 'eval-source-map')
@@ -26,7 +28,7 @@ webpackConfig
     .end()
   .output
     .path(isProd ? path.resolve(__dirname, '../dist/vue') : undefined)
-    .publicPath(isProd ? '' : '/')
+    .publicPath(isProd ? 'https://better-scroll.github.io/examples/' : '/')
     .filename(isProd ? 'static/js/[name].[chunkhash].js' : '[name].js')
     .chunkFilename(isProd ? 'static/js/[id].[chunkhash].js' : '[name].js')
     .end()
@@ -63,7 +65,7 @@ webpackConfig
         .end()
       .end()
     .rule('url')
-      .test(/\.(png|jpe?g|gif|svg)(\?.*)?$/)
+      .test(/\.(png|jpe?g|gif|svg|webp)(\?.*)?$/)
       .use('url')
         .loader('url-loader')
         .options({
@@ -151,12 +153,10 @@ webpackConfig
   }, () => {
     webpackConfig
       .optimization
-        .minimizer([new UglifyJsPlugin({
-          uglifyOptions: {
-            warnings: false
-          }
-        })])
+        .minimizer('TerserPlugin')
+          .use(TerserPlugin)
         .end()
+      .end()
       .plugin('OptimizeCSSPlugin')
         .use(OptimizeCSSPlugin, [{
           cssProcessorOptions: {
@@ -215,4 +215,17 @@ getPackagesName().forEach((name) => {
   webpackConfig.resolve.alias.set(`${name}$`, `${name}/src/index.ts`)
 })
 
-module.exports = webpackConfig.toConfig()
+let config = webpackConfig.toConfig()
+// run test e2e
+if (e2e) {
+  config.devServer.setup = (app, server) => {
+    server.middleware.waitUntilValid(async () => {
+      // back to src directory
+      const cwd = path.join(__dirname, '../../')
+
+      await execa('yarn', ['test:e2e'], { stdio: 'inherit', cwd })
+    })
+  }
+}
+
+module.exports = config

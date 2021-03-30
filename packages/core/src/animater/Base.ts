@@ -2,22 +2,28 @@ import {
   EaseFn,
   safeCSSStyleDeclaration,
   cancelAnimationFrame,
-  EventEmitter
+  EventEmitter,
+  Probe,
 } from '@better-scroll/shared-utils'
 import Translater, { TranslaterPoint } from '../translater'
 
-export type Displacement = [number, number]
-export default abstract class Base {
+export interface ExposedAPI {
+  stop(): void
+}
+
+export default abstract class Base implements ExposedAPI {
+  content: HTMLElement
   style: safeCSSStyleDeclaration
   hooks: EventEmitter
-  timer: number
+  timer: number = 0
   pending: boolean
+  callStopWhenPending: boolean
   forceStopped: boolean
-  _reflow: number
+  _reflow: number;
   [key: string]: any
 
   constructor(
-    public content: HTMLElement,
+    content: HTMLElement,
     public translater: Translater,
     public options: {
       probeType: number
@@ -28,10 +34,11 @@ export default abstract class Base {
       'end',
       'beforeForceStop',
       'forceStop',
+      'callStop',
       'time',
-      'timeFunction'
+      'timeFunction',
     ])
-    this.style = content.style as safeCSSStyleDeclaration
+    this.setContent(content)
   }
 
   translate(endPoint: TranslaterPoint) {
@@ -46,13 +53,32 @@ export default abstract class Base {
     this.forceStopped = forceStopped
   }
 
+  setCallStop(called: boolean) {
+    this.callStopWhenPending = called
+  }
+
+  setContent(content: HTMLElement) {
+    if (this.content !== content) {
+      this.content = content
+      this.style = content.style as safeCSSStyleDeclaration
+      this.stop()
+    }
+  }
+  clearTimer() {
+    if (this.timer) {
+      cancelAnimationFrame(this.timer)
+      this.timer = 0
+    }
+  }
+
   abstract move(
     startPoint: TranslaterPoint,
     endPoint: TranslaterPoint,
     time: number,
-    easing: string | EaseFn,
-    isSilent?: boolean
+    easing: string | EaseFn
   ): void
+
+  abstract doStop(): void
   abstract stop(): void
 
   destroy() {

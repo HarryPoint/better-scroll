@@ -5,7 +5,7 @@ import {
   requestAnimationFrame,
   cancelAnimationFrame,
   EaseFn,
-  Probe
+  Probe,
 } from '@better-scroll/shared-utils'
 
 export default class Animation extends Base {
@@ -13,21 +13,14 @@ export default class Animation extends Base {
     startPoint: TranslaterPoint,
     endPoint: TranslaterPoint,
     time: number,
-    easingFn: EaseFn | string,
-    isSlient?: boolean
+    easingFn: EaseFn | string
   ) {
     // time is 0
     if (!time) {
       this.translate(endPoint)
-      // if we change content's transformY in a tick
-      // such as: 0 -> 50px -> 0
-      // transitionend will not be triggered
-      // so we forceupdate by reflow
-      this._reflow = this.content.offsetHeight
-      // no need to dispatch move and end when slient
-      if (isSlient) return
-
-      this.hooks.trigger(this.hooks.eventTypes.move, endPoint)
+      if (this.options.probeType === Probe.Realtime) {
+        this.hooks.trigger(this.hooks.eventTypes.move, endPoint)
+      }
       this.hooks.trigger(this.hooks.eventTypes.end, endPoint)
       return
     }
@@ -41,57 +34,82 @@ export default class Animation extends Base {
     easingFn: EaseFn
   ) {
     let startTime = getNow()
-    let destTime = startTime + duration
-
+    const destTime = startTime + duration
+    const isRealtimeProbeType = this.options.probeType === Probe.Realtime
     const step = () => {
       let now = getNow()
-
       // js animation end
       if (now >= destTime) {
         this.translate(endPoint)
-
-        this.hooks.trigger(this.hooks.eventTypes.move, endPoint)
+        if (isRealtimeProbeType) {
+          this.hooks.trigger(this.hooks.eventTypes.move, endPoint)
+        }
         this.hooks.trigger(this.hooks.eventTypes.end, endPoint)
         return
       }
 
       now = (now - startTime) / duration
       let easing = easingFn(now)
-      const newPoint = {} as { [key: string]: any }
-      Object.keys(endPoint).forEach(key => {
+      const newPoint = {} as TranslaterPoint
+      Object.keys(endPoint).forEach((key) => {
         const startValue = startPoint[key]
         const endValue = endPoint[key]
         newPoint[key] = (endValue - startValue) * easing + startValue
       })
-      this.translate(<TranslaterPoint>newPoint)
+      this.translate(newPoint)
+
+      if (isRealtimeProbeType) {
+        this.hooks.trigger(this.hooks.eventTypes.move, newPoint)
+      }
 
       if (this.pending) {
         this.timer = requestAnimationFrame(step)
       }
 
-      if (this.options.probeType === Probe.Realtime) {
-        this.hooks.trigger(this.hooks.eventTypes.move, newPoint)
+      // call bs.stop() should not dispatch end hook again.
+      // forceStop hook will do this.
+      /* istanbul ignore if  */
+      if (!this.pending) {
+        if (this.callStopWhenPending) {
+          this.callStopWhenPending = false
+        } else {
+          // raf ends should dispatch end hook.
+          this.hooks.trigger(this.hooks.eventTypes.end, endPoint)
+        }
       }
     }
 
     this.setPending(true)
+    // when manually call bs.stop(), then bs.scrollTo()
+    // we should reset callStopWhenPending to dispatch end hook
+    if (this.callStopWhenPending) {
+      this.setCallStop(false)
+    }
     cancelAnimationFrame(this.timer)
     step()
   }
 
-  stop() {
+  doStop(): boolean {
+    const pending = this.pending
+    this.setForceStopped(false)
+    this.setCallStop(false)
     // still in requestFrameAnimation
-    if (this.pending) {
+    if (pending) {
       this.setPending(false)
       cancelAnimationFrame(this.timer)
       const pos = this.translater.getComputedPosition()
       this.setForceStopped(true)
-
-      if (this.hooks.trigger(this.hooks.eventTypes.beforeForceStop, pos)) {
-        return
-      }
+      this.setCallStop(true)
 
       this.hooks.trigger(this.hooks.eventTypes.forceStop, pos)
+    }
+    return pending
+  }
+
+  stop() {
+    const stopFromAnimation = this.doStop()
+    if (stopFromAnimation) {
+      this.hooks.trigger(this.hooks.eventTypes.callStop)
     }
   }
 }

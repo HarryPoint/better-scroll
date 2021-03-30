@@ -1,9 +1,12 @@
 import ActionsHandler, {
-  Options
+  Options,
 } from '@better-scroll/core/src/base/ActionsHandler'
 import {
   dispatchTouch,
-  dispatchMouse
+  dispatchMouse,
+  dispatchTouchStart,
+  dispatchTouchEnd,
+  dispatchTouchCancel,
 } from '@better-scroll/core/src/__tests__/__utils__/event'
 
 describe('ActionsHandler', () => {
@@ -21,32 +24,33 @@ describe('ActionsHandler', () => {
       preventDefault: true,
       stopPropagation: true,
       preventDefaultException: {
-        tagName: /^(INPUT|TEXTAREA|BUTTON|SELECT|AUDIO)$/
+        tagName: /^(INPUT|TEXTAREA|BUTTON|SELECT|AUDIO)$/,
       },
       tagException: { tagName: /^TEXTAREA$/ },
-      momentumLimitDistance: 15
+      autoEndDistance: 5,
     }
   })
   afterEach(() => {
     jest.clearAllMocks()
   })
 
-  it('should bind click handler when options.disableMouse is true', () => {
+  it('should bind mouse event when options.disableMouse is false', () => {
+    options.disableTouch = true
     actionsHandler = new ActionsHandler(wrapper, options)
 
     const wrapperEventsName = actionsHandler.wrapperEventRegister.events.map(
-      event => event.name
+      (event) => event.name
     )
 
     const targetEventsName = actionsHandler.targetEventRegister.events.map(
-      event => event.name
+      (event) => event.name
     )
 
     expect(wrapperEventsName).toMatchObject(['mousedown'])
     expect(targetEventsName).toMatchObject(['mousemove', 'mouseup'])
   })
 
-  it('should invoice start method when dispatch mousedown', () => {
+  it('should invoke start method when dispatch mousedown', () => {
     actionsHandler = new ActionsHandler(wrapper, options)
     const beforeStartMockHandler = jest.fn().mockImplementation(() => {
       return 'dummy test'
@@ -60,26 +64,59 @@ describe('ActionsHandler', () => {
 
     dispatchMouse(wrapper, 'mousedown')
 
-    expect(beforeStartMockHandler).toBeCalled()
-    expect(startMockHandler).toBeCalled()
+    expect(beforeStartMockHandler).toBeCalledTimes(1)
+    expect(startMockHandler).toBeCalledTimes(1)
+
+    // return early
+    actionsHandler.setInitiated(1)
+    dispatchMouse(wrapper, 'mousedown')
+    expect(beforeStartMockHandler).toBeCalledTimes(1)
+    expect(startMockHandler).toBeCalledTimes(1)
+
+    // only allow mouse left button
+    actionsHandler.setInitiated(0)
+    dispatchMouse(wrapper, 'mousedown', false)
+    expect(beforeStartMockHandler).toBeCalledTimes(1)
+    expect(startMockHandler).toBeCalledTimes(1)
+
+    // cancelable beforeStart hook
+    actionsHandler.hooks.on('beforeStart', () => true)
+    dispatchMouse(wrapper, 'mousedown')
+    expect(beforeStartMockHandler).toBeCalledTimes(2)
+    expect(startMockHandler).toBeCalledTimes(1)
   })
 
-  it('should invoice move method when dispatch touchmove', () => {
+  it('should invoke move method when dispatch touchmove', () => {
     actionsHandler = new ActionsHandler(wrapper, options)
-    const moveMockHandler = jest.fn().mockImplementation(() => {
+    const moveMockHandler1 = jest.fn().mockImplementationOnce(() => {
+      return true
+    })
+    const moveMockHandler2 = jest.fn().mockImplementation(() => {
       return 'dummy test'
     })
 
-    actionsHandler.hooks.on('move', moveMockHandler)
+    actionsHandler.hooks.on('move', moveMockHandler1)
+    actionsHandler.hooks.on('move', moveMockHandler2)
 
     dispatchMouse(wrapper, 'mousedown')
 
     dispatchMouse(window, 'mousemove')
 
-    expect(moveMockHandler).toBeCalled()
+    expect(moveMockHandler1).toBeCalledTimes(1)
+
+    // cancelable move hook
+    expect(moveMockHandler2).not.toBeCalled()
+
+    // simulate finger moved out of viewport
+    actionsHandler.pointX = 5
+    const endMockHandler = jest.fn()
+    actionsHandler.hooks.on(actionsHandler.hooks.eventTypes.end, endMockHandler)
+    dispatchMouse(window, 'mousemove')
+
+    expect(endMockHandler).toBeCalled()
   })
 
-  it('should invoice end method when dispatch touchend', () => {
+  it('should invoke end method when dispatch touchend', () => {
     actionsHandler = new ActionsHandler(wrapper, options)
     const endMockHandler = jest.fn().mockImplementation(() => {
       return 'dummy test'
@@ -87,9 +124,24 @@ describe('ActionsHandler', () => {
 
     actionsHandler.hooks.on('end', endMockHandler)
 
-    dispatchMouse(wrapper, 'mousedown')
+    dispatchTouchStart(wrapper, [{ pageX: 0, pageY: 0 }])
 
-    dispatchMouse(window, 'mouseup')
+    dispatchTouchEnd(window, [{ pageX: 0, pageY: 0 }])
+
+    expect(endMockHandler).toBeCalled()
+  })
+
+  it('should invoke end method when dispatch touchcancel', () => {
+    actionsHandler = new ActionsHandler(wrapper, options)
+    const endMockHandler = jest.fn().mockImplementation(() => {
+      return 'dummy test'
+    })
+
+    actionsHandler.hooks.on('end', endMockHandler)
+
+    dispatchTouchStart(wrapper, [{ pageX: 0, pageY: 0 }])
+
+    dispatchTouchCancel(window, [{ pageX: 0, pageY: 0 }])
 
     expect(endMockHandler).toBeCalled()
   })
@@ -106,8 +158,8 @@ describe('ActionsHandler', () => {
     dispatchTouch(wrapper, 'click', [
       {
         pageX: 10,
-        pageY: 10
-      }
+        pageY: 10,
+      },
     ])
 
     expect(clickMockHandler).toBeCalled()
@@ -123,5 +175,22 @@ describe('ActionsHandler', () => {
     dispatchMouse(textarea, 'mousedown')
 
     expect(actionsHandler.initiated).toBeFalsy()
+  })
+
+  it('destroy()', () => {
+    actionsHandler = new ActionsHandler(wrapper, options)
+
+    actionsHandler.destroy()
+
+    expect(actionsHandler.wrapperEventRegister.events.length).toBe(0)
+    expect(actionsHandler.targetEventRegister.events.length).toBe(0)
+    expect(actionsHandler.hooks.eventTypes).toMatchObject({})
+    expect(actionsHandler.hooks.events).toMatchObject({})
+  })
+
+  it('setContent()', () => {
+    const p = document.createElement('p')
+    actionsHandler.setContent(p)
+    expect(actionsHandler.wrapper).toBe(p)
   })
 })

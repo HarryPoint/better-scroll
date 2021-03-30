@@ -3,12 +3,14 @@ import {
   hasPerspective,
   hasTouch,
   Probe,
-  EventPassthrough
+  EventPassthrough,
+  extend,
 } from '@better-scroll/shared-utils'
+
 // type
-export type tap = 'tap' | ''
-export type bounceOptions = Partial<BounceConfig> | boolean
-export type dblclickOptions = Partial<DblclickConfig> | boolean
+export type Tap = 'tap' | ''
+export type BounceOptions = Partial<BounceConfig> | boolean
+export type DblclickOptions = Partial<DblclickConfig> | boolean
 
 // interface
 export interface BounceConfig {
@@ -22,7 +24,58 @@ export interface DblclickConfig {
   delay: number
 }
 
-export class Options {
+export interface CustomOptions {}
+
+export interface DefOptions {
+  [key: string]: any
+  startX?: number
+  startY?: number
+  scrollX?: boolean
+  scrollY?: boolean
+  freeScroll?: boolean
+  directionLockThreshold?: number
+  eventPassthrough?: string
+  click?: boolean
+  tap?: Tap
+  bounce?: BounceOptions
+  bounceTime?: number
+  momentum?: boolean
+  momentumLimitTime?: number
+  momentumLimitDistance?: number
+  swipeTime?: number
+  swipeBounceTime?: number
+  deceleration?: number
+  flickLimitTime?: number
+  flickLimitDistance?: number
+  resizePolling?: number
+  probeType?: number
+  stopPropagation?: boolean
+  preventDefault?: boolean
+  preventDefaultException?: {
+    tagName?: RegExp
+    className?: RegExp
+  }
+  tagException?: {
+    tagName?: RegExp
+    className?: RegExp
+  }
+  HWCompositing?: boolean
+  useTransition?: boolean
+  bindToWrapper?: boolean
+  bindToTarget?: boolean
+  disableMouse?: boolean
+  disableTouch?: boolean
+  autoBlur?: boolean
+  translateZ?: string
+  dblclick?: DblclickOptions
+  autoEndDistance?: number
+  outOfBoundaryDampingFactor?: number
+  specifiedIndexAsContent?: number
+}
+
+export interface Options extends DefOptions, CustomOptions {}
+export class CustomOptions {}
+export class OptionsConstructor extends CustomOptions implements DefOptions {
   [key: string]: any
   startX: number
   startY: number
@@ -32,8 +85,8 @@ export class Options {
   directionLockThreshold: number
   eventPassthrough: string
   click: boolean
-  tap: tap
-  bounce: bounceOptions
+  tap: Tap
+  bounce: BounceConfig
   bounceTime: number
   momentum: boolean
   momentumLimitTime: number
@@ -58,19 +111,24 @@ export class Options {
   HWCompositing: boolean
   useTransition: boolean
   bindToWrapper: boolean
-  disableMouse: boolean | ''
+  bindToTarget: boolean
+  disableMouse: boolean
   disableTouch: boolean
   autoBlur: boolean
   translateZ: string
-  dblclick: dblclickOptions
+  dblclick: DblclickOptions
+  autoEndDistance: number
+  outOfBoundaryDampingFactor: number
+  specifiedIndexAsContent: number
 
   constructor() {
+    super()
     this.startX = 0
     this.startY = 0
     this.scrollX = false
     this.scrollY = true
     this.freeScroll = false
-    this.directionLockThreshold = 5
+    this.directionLockThreshold = 0
     this.eventPassthrough = EventPassthrough.None
     this.click = false
     this.dblclick = false
@@ -80,7 +138,7 @@ export class Options {
       top: true,
       bottom: true,
       left: true,
-      right: true
+      right: true,
     }
     this.bounceTime = 800
 
@@ -102,36 +160,43 @@ export class Options {
     this.stopPropagation = false
     this.preventDefault = true
     this.preventDefaultException = {
-      tagName: /^(INPUT|TEXTAREA|BUTTON|SELECT|AUDIO)$/
+      tagName: /^(INPUT|TEXTAREA|BUTTON|SELECT|AUDIO)$/,
     }
     this.tagException = {
-      tagName: /^TEXTAREA$/
+      tagName: /^TEXTAREA$/,
     }
 
     this.HWCompositing = true
     this.useTransition = true
 
     this.bindToWrapper = false
+    this.bindToTarget = false
     this.disableMouse = hasTouch
     this.disableTouch = !hasTouch
     this.autoBlur = true
+
+    this.autoEndDistance = 5
+    this.outOfBoundaryDampingFactor = 1 / 3
+    this.specifiedIndexAsContent = 0
   }
-  merge(options?: { [key: string]: any }) {
+  merge(options?: Options) {
     if (!options) return this
     for (let key in options) {
+      if (key === 'bounce') {
+        this.bounce = this.resolveBounce(options[key]!)
+        continue
+      }
       this[key] = options[key]
     }
     return this
   }
   process() {
     this.translateZ =
-      this.HWCompositing && hasPerspective ? ' translateZ(0)' : ''
+      this.HWCompositing && hasPerspective ? ' translateZ(1px)' : ''
 
     this.useTransition = this.useTransition && hasTransition
 
     this.preventDefault = !this.eventPassthrough && this.preventDefault
-
-    this.resolveBounce()
 
     // If you want eventPassthrough I have to lock one of the axes
     this.scrollX =
@@ -155,19 +220,27 @@ export class Options {
     return this
   }
 
-  resolveBounce() {
-    const directions = ['top', 'right', 'bottom', 'left']
-    const bounce = this.bounce
-    if (bounce === false || bounce === true) {
-      this.bounce = makeMap(directions, bounce as boolean)
+  resolveBounce(bounceOptions: BounceOptions): BounceConfig {
+    const DEFAULT_BOUNCE = {
+      top: true,
+      right: true,
+      bottom: true,
+      left: true,
     }
-  }
-}
+    const NEGATED_BOUNCE = {
+      top: false,
+      right: false,
+      bottom: false,
+      left: false,
+    }
 
-function makeMap(keys: string[], val: boolean = true) {
-  const ret: { [key: string]: boolean } = {}
-  keys.forEach(key => {
-    ret[key] = val
-  })
-  return ret
+    let ret: BounceConfig
+    if (typeof bounceOptions === 'object') {
+      ret = extend(DEFAULT_BOUNCE, bounceOptions)
+    } else {
+      ret = bounceOptions ? DEFAULT_BOUNCE : NEGATED_BOUNCE
+    }
+
+    return ret
+  }
 }

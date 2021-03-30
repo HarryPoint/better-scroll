@@ -27,7 +27,13 @@ const ScrollerActions = jest
         enabled: true,
         startTime: 0,
         endTime: 0,
-        getCurrentPos: jest.fn(),
+        ensuringInteger: false,
+        getCurrentPos: jest.fn().mockImplementation(() => {
+          return {
+            x: 0,
+            y: 0,
+          }
+        }),
         refresh: jest.fn(),
         destroy: jest.fn(),
         hooks: new EventEmitter([
@@ -37,8 +43,10 @@ const ScrollerActions = jest
           'scroll',
           'beforeEnd',
           'end',
-          'scrollEnd'
-        ])
+          'scrollEnd',
+          'contentNotMoved',
+          'detectMovingDirection',
+        ]),
       }
     }
   )

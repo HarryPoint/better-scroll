@@ -1,81 +1,151 @@
-# How to write a plugin
+# How to write plugins
 
-A BetterScroll plugin should be a class with the following feature:
+### Conceive The Function Of The Plugin
 
-- Has a static `pluginName` property.
-- The first arguments of constructor is BetterScroll instance(`bs`). You can fetch or change all the properties of `bs` in your plugin.
+```js
+  import BScroll from '@better-scroll/core'
+  import MyPlugin from '@better-scroll/my-plugin'
 
-The simplest plugin is as follow:
+  BScroll.use(MyPlugin)
 
-```typescript
-  export default class MyPlugin {
-    static pluginName = 'myPlugin'
-    constructor(public scroll: BScroll){
-      // this.scroll is BetterScroll instance
-    }
-  }
-```
-
-:::warning
-  The value corresponding to the pluginName property on the plugin class must have the top-level root property name that initializes the options passed to BetterScroll. Otherwise, the plugin initialization will not be executed when initing BetterScroll.
-
-  ```js
-  // myplugin.js
-  export default class MyPlugin {
-    static pluginName = 'myPlugin'
-    constructor(public scroll: BScroll){}
-  }
-
-  // main.js
-  import BetterScroll from '@better-scroll/core'
-  import MyPlugin from 'myplugin.js'
-  BetterScroll.use(MyPlugin)
-
-  // Pass in the options of the top-level property called 'myPlugin'.
-  // Because the value of MyPlugin.pluginName is 'myPlugin'.
-  let bs = new BetterScroll('.wrapper', {
-    myPlugin: {}
+  const bs = new BScroll('.wrapper', {
+    myPlugin: {
+      scrollText: 'I am scrolling',
+      scrollEndText: 'Scroll has ended'
+    },
+    // or
+    myPlugin: true
   })
-  let myPluginInstance = bs.plugins.myPlugin
-  ```
-:::
 
-## Expose functions
+  // Use the event that is proxied to bs by plugin
+  bs.on('printScrollEndText', (scrollEndText) => {
+    console.log(scrollEndText) // print "Scroll has ended, position is (xx, yy)"
+  })
 
-`proxy` function can be used to proxy properties or methods of the plugin to `bs`.
+  // Use the method that is proxied to bs by plugin
+  bs.printScrollText() // print "I am scrolling"
+```
+
+### Write Plugin
+
+1. **TypeScript declare merging and expose plugin methods**
 
 ```typescript
-  export default class MyPlugin {
-    static pluginName = 'myPlugin'
-    constructor(private scroll: BScroll){
-      // register functions or properties
-      this.scroll.proxy([
-        {
-          key: 'newFunction',
-          sourceKey: 'plugins.myPlugin.newFunction'
-        },
-        {
-          key: 'newProperty',
-          sourceKey: 'plugins.myPlugin.newProperty'
+import BScroll from '@better-scroll/core'
+
+export type MyPluginOptions = Partial<MyPluginConfig> | true
+
+type MyPluginConfig = {
+  scrollText: string,
+  scrollEndText: string
+}
+
+interface PluginAPI {
+  printScrollText(): void
+}
+
+declare module '@better-scroll/core' {
+  interface CustomOptions {
+    myPlugin?: myPluginOptions
+  }
+
+  interface CustomAPI {
+    myPlugin: PluginAPI
+  }
+}
+```
+
+The advantage of this is that when the `myPlugin` plugin is imported and BetterScroll is instantiated, there can be corresponding Options prompts and bs can have corresponding method prompts. Take the pulldown plugin as an example:
+
+<img data-zoomable :src="$withBase('/assets/images/tip1.png')" alt="">
+
+
+<img data-zoomable :src="$withBase('/assets/images/tip2.png')" alt="">
+
+2. **Write the plugin logic**
+
+    - **BetterScroll plugins need to be a class, and have the following characteristics:**
+
+      - The static pluginName property.
+      - Implement the PluginAPI interface (only if it is necessary to proxy the plugin method to bs).
+      - The first argument of the constructor is the BetterScroll instance `bs`. You can inject your own logic through the **event** or **hook** of bs.
+
+      ```typescript
+        export default class MyPlugin implements PluginAPI {
+          static pluginName = 'myPlugin'
+          public options: MyPluginConfig
+          constructor(public scroll: BScroll){
+            this.handleOptions()
+
+            this.handleBScroll()
+
+            this.registerHooks()
+          }
         }
-      ])
-    }
-  }
-```
+      ```
 
-## Register hooks
+    - **handleOptions**
 
-You can add new hooks to `bs` by calling `registerType` function. Then you can trigger this hook in somewhere.
+      Merge user options，narrow down it‘s type。
 
-```typescript
-  export default class MyPlugin {
-    static pluginName = 'myPlugin'
-    constructor(private scroll: BScroll){
-      // register a hook
-      this.scroll.registerType(['yourHook'])
-    }
-    someFunction() {
-      this.scroll.trigger(this.scroll.eventTypes.yourHook) // trigger a hook
-    }
-  }
-```
+      ```typescript
+        import { extend } from '@better-scroll/shared-utils'
+        export default class MyPlugin {
+          private handleOptions() {
+            const userOptions = (this.scroll.options.myPlugin === true
+              ? {}
+              : this.scroll.options.myPlugin) as Partial<MyPluginConfig>
+            const defaultOptions: MyPluginConfig = {
+              scrollText: 'I am scrolling',
+              scrollEndText: 'Scroll has ended'
+            }
+            this.options = extend(defaultOptions, userOptions)
+          }
+        }
+      ```
+
+    - **handleBScroll**
+
+      Proxy events and methods to the BetterScroll instance.
+
+      ```typescript
+        export default class MyPlugin implements PluginAPI {
+          private handleBScroll() {
+            const propertiesConfig = [
+              {
+                key: 'printScrollText',
+                sourceKey: 'plugins.myPluginOptions.printScrollText'
+              }
+            ]
+            // myPlugin.printScrollText is proxied to bs.printScrollText
+            this.scroll.proxy(propertiesConfig)
+            // Proxy printScrollEndText event to bs
+            // Users can subscribe to events via bs.on('printScrollEndText', handler)
+            this.scroll.registerType(['printScrollEndText'])
+          }
+
+          printScrollText() {
+            console.log(this.options.scrollText)
+          }
+        }
+      ```
+
+    - **registerHooks**
+
+      Tap into the bs hook, implement the logic of the plugin, and dispatch custom events of the plugin.
+
+      ```typescript
+        export default class MyPlugin implements PluginAPI {
+          private registerHooks() {
+            const scroll = this.scroll
+            scroll.on(scroll.eventTypes.scrollEnd, ({ x, y }) => {
+              scroll.trigger(
+                scroll.eventTypes.printScrollEndText,
+                `${this.options.scrollEndText}, position is (${x}, ${y})`
+              )
+            })
+          }
+        }
+      ```
+
+Congratulations, a simple BetterScroll plugin has been completed. If you need more complex plugin to meet your need, you can read [Events and Hooks](../guide/base-scroll-api.html#events-vs-hooks), it can help you to complete a fantastic plugin.
